@@ -61,6 +61,17 @@ void UGDGA_Flash::EventReceived(FGameplayTag EventTag, FGameplayEventData EventD
 		return;
 	}
 
+	//The ability is executed on the server
+	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && EventTag == FGameplayTag::RequestGameplayTag(FName("Event.Montage.Tp")))
+	{
+		AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
+		if (!Hero)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		}
+
+		Hero->SetActorLocation(Hero->GetActorForwardVector() * Range + Hero->GetActorLocation());
+	}
 	
 }
 
