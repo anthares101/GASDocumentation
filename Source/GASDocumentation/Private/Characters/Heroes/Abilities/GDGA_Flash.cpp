@@ -3,10 +3,7 @@
 
 #include "Characters/Heroes/Abilities/GDGA_Flash.h"
 #include "AbilitySystemComponent.h"
-#include "Camera/CameraComponent.h"
 #include "Characters/Heroes/GDHeroCharacter.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Kismet/KismetMathLibrary.h"
 
 UGDGA_Flash::UGDGA_Flash()
 {
