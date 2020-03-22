@@ -67,7 +67,8 @@ void UGDGA_Flash::EventReceived(FGameplayTag EventTag, FGameplayEventData EventD
 			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		}
 
-		Hero->SetActorLocation(Hero->GetActorForwardVector() * Range + Hero->GetActorLocation());
+		Hero->TeleportTo(Hero->GetActorForwardVector() * Range + Hero->GetActorLocation(), 
+						 Hero->GetActorRotation());
 	}
 	
 }
