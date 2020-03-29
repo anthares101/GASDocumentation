@@ -8,6 +8,7 @@
 #include "Abilities/GameplayAbilityTargetActor.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/Heroes/GDHeroCharacter.h"
+#include "Player/GDPlayerState.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -33,72 +34,57 @@ void UGDGA_BulletRain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 	}
 
 	AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
-	if (!Hero)
+	AGDPlayerState* PD = Cast <AGDPlayerState>(GetOwningActorFromActorInfo());
+	if (!Hero || !PD)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
-	
-	TargetActor = GetWorld()->SpawnActorDeferred<AGameplayAbilityTargetActor_Trace>(TargetActorClass, FTransform(), GetOwningActorFromActorInfo(),
-																					Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
+	FGameplayAbilityTargetingLocationInfo targetingLocationInfo = MakeTargetLocationInfoFromOwnerActor();
+	FVector newLocation = Hero->GetActorForwardVector();
+	newLocation = newLocation * 200 + targetingLocationInfo.LiteralTransform.GetLocation();
+	targetingLocationInfo.LiteralTransform.SetLocation(newLocation);
+
+	//Spawn the indicator
+	TargetActor = GetWorld()->SpawnActorDeferred<AGameplayAbilityTargetActor_Trace>(TargetActorClass, targetingLocationInfo.LiteralTransform, GetOwningActorFromActorInfo(),
+																				Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	TargetActor->MaxRange = Range;
+	TargetActor->StartLocation = targetingLocationInfo;
+	TargetActor->FinishSpawning(targetingLocationInfo.LiteralTransform);
 
 	UAbilityTask_WaitTargetData* Task = UAbilityTask_WaitTargetData::WaitTargetDataUsingActor(this, NAME_None, EGameplayTargetingConfirmation::UserConfirmed, TargetActor);
 	Task->ValidData.AddDynamic(this, &UGDGA_BulletRain::ValidData);
 	Task->Cancelled.AddDynamic(this, &UGDGA_BulletRain::Cancelled);
+	
+	//Show confirmation message
+	PD->ShowAbilityConfirmCancelText(true);
 
 	// ReadyForActivation() is how you activate the AbilityTask in C++. Blueprint has magic from K2Node_LatentGameplayTaskCall that will automatically call ReadyForActivation().
 	Task->ReadyForActivation();
 }
 
+void UGDGA_BulletRain::DeleteText() {
+	AGDPlayerState* PD = Cast <AGDPlayerState>(GetOwningActorFromActorInfo());
+	if (PD)
+	{
+		PD->ShowAbilityConfirmCancelText(false);
+	}
+}
+
 void UGDGA_BulletRain::Cancelled(const FGameplayAbilityTargetDataHandle& Data)
 {
+	UE_LOG(LogTemp, Warning, TEXT("CANCELLED"));
+	DeleteText();
+
 	TargetActor->Destroy();
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UGDGA_BulletRain::ValidData(const FGameplayAbilityTargetDataHandle& Data)
 {
+	UE_LOG(LogTemp, Warning, TEXT("VALID"));
+	DeleteText();
+
 	TargetActor->Destroy();
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-	// Montage told us to end the ability before the montage finished playing.
-	// Montage was set to continue playing animation even after ability ends so this is okay.
-	/*if (EventTag == FGameplayTag::RequestGameplayTag(FName("Event.Montage.EndAbility")))
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		return;
-	}
-
-	// Only spawn projectiles on the Server.
-	// Predicting projectiles is an advanced topic not covered in this example.
-	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && EventTag == FGameplayTag::RequestGameplayTag(FName("Event.Montage.SpawnProjectile")))
-	{
-		AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
-		if (!Hero)
-		{
-			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		}
-
-		FVector Start = Hero->GetGunComponent()->GetSocketLocation(FName("Muzzle"));
-		FVector End = Hero->GetCameraBoom()->GetComponentLocation() + Hero->GetFollowCamera()->GetForwardVector() * Range;
-		FRotator Rotation = UKismetMathLibrary::FindLookAtRotation(Start, End);
-
-		FGameplayEffectSpecHandle DamageEffectSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffect, GetAbilityLevel());
-
-		// Pass the damage to the Damage Execution Calculation through a SetByCaller value on the GameplayEffectSpec
-		DamageEffectSpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Damage")), Damage);
-
-		FTransform MuzzleTransform = Hero->GetGunComponent()->GetSocketTransform(FName("Muzzle"));
-		MuzzleTransform.SetRotation(Rotation.Quaternion());
-		MuzzleTransform.SetScale3D(FVector(1.0f));
-
-		FActorSpawnParameters SpawnParameters;
-		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-		AGDProjectile* Projectile = GetWorld()->SpawnActorDeferred<AGDProjectile>(ProjectileClass, MuzzleTransform, GetOwningActorFromActorInfo(),
-			Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-		Projectile->DamageEffectSpecHandle = DamageEffectSpecHandle;
-		Projectile->Range = Range;
-		Projectile->FinishSpawning(MuzzleTransform);
-	}*/
 }

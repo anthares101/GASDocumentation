@@ -32,6 +32,7 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	//Targetting zone
 	AGameplayAbilityTargetActor_Trace* TargetActor;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
@@ -39,6 +40,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
 		float Damage;
+
+	//Destroy the confirm/cancel text
+	void DeleteText();
 
 	UFUNCTION()
 		void ValidData(const FGameplayAbilityTargetDataHandle& Data);

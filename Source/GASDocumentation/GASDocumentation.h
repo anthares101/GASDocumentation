@@ -49,5 +49,7 @@ enum class EGDAbilityInputID : uint8
 	// 10 Flash
 	Ability6		UMETA(DisplayName = "Ability6"),
 	// 11 Mystic Shot
-	Ability7		UMETA(DisplayName = "Ability7")
+	Ability7		UMETA(DisplayName = "Ability7"),
+	// 11 Mystic Shot
+	Ability8		UMETA(DisplayName = "Ability8")
 };
