@@ -6,7 +6,6 @@
 #include "Abilities/Tasks/AbilityTask_WaitTargetData.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Abilities/GameplayAbilityTargetActor.h"
-#include "Camera/CameraComponent.h"
 #include "Characters/Heroes/GDHeroCharacter.h"
 #include "Player/GDPlayerState.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -28,11 +27,6 @@ UGDGA_BulletRain::UGDGA_BulletRain()
 
 void UGDGA_BulletRain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-	}
-
 	AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
 	AGDPlayerState* PD = Cast <AGDPlayerState>(GetOwningActorFromActorInfo());
 	if (!Hero || !PD)
@@ -47,12 +41,19 @@ void UGDGA_BulletRain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
 	//Spawn the indicator
 	TargetActor = GetWorld()->SpawnActorDeferred<AGameplayAbilityTargetActor_Trace>(TargetActorClass, targetingLocationInfo.LiteralTransform, GetOwningActorFromActorInfo(),
-																				Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+																					Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	TargetActor->MaxRange = Range;
 	TargetActor->StartLocation = targetingLocationInfo;
 	TargetActor->FinishSpawning(targetingLocationInfo.LiteralTransform);
 
-	UAbilityTask_WaitTargetData* Task = UAbilityTask_WaitTargetData::WaitTargetDataUsingActor(this, NAME_None, EGameplayTargetingConfirmation::UserConfirmed, TargetActor);
+	//Move cameraBoom up to help targeting
+	FVector cameraBoomLoc = Hero->GetStartingCameraBoomLocation();
+	cameraBoomLoc.Z = cameraBoomLoc.Z + 100;
+
+	Hero->GetCameraBoom()->SetRelativeLocation(cameraBoomLoc);
+
+	//Start a task that will wait for the user confirmation of the ability target
+	Task = UAbilityTask_WaitTargetData::WaitTargetDataUsingActor(this, NAME_None, EGameplayTargetingConfirmation::UserConfirmed, TargetActor);
 	Task->ValidData.AddDynamic(this, &UGDGA_BulletRain::ValidData);
 	Task->Cancelled.AddDynamic(this, &UGDGA_BulletRain::Cancelled);
 	
@@ -63,28 +64,34 @@ void UGDGA_BulletRain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 	Task->ReadyForActivation();
 }
 
-void UGDGA_BulletRain::DeleteText() {
+void UGDGA_BulletRain::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+
+	AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
 	AGDPlayerState* PD = Cast <AGDPlayerState>(GetOwningActorFromActorInfo());
-	if (PD)
+	if (Hero && PD)
 	{
 		PD->ShowAbilityConfirmCancelText(false);
+		Hero->GetCameraBoom()->SetRelativeLocation(Hero->GetStartingCameraBoomLocation());
 	}
+
+	TargetActor->Destroy();
 }
 
 void UGDGA_BulletRain::Cancelled(const FGameplayAbilityTargetDataHandle& Data)
 {
-	UE_LOG(LogTemp, Warning, TEXT("CANCELLED"));
-	DeleteText();
-
-	TargetActor->Destroy();
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UGDGA_BulletRain::ValidData(const FGameplayAbilityTargetDataHandle& Data)
 {
-	UE_LOG(LogTemp, Warning, TEXT("VALID"));
-	DeleteText();
+	if (!CommitAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo()))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
 
-	TargetActor->Destroy();
+	//Do something
+
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
