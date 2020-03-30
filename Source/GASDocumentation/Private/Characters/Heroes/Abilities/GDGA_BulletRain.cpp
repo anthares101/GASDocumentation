@@ -91,7 +91,39 @@ void UGDGA_BulletRain::ValidData(const FGameplayAbilityTargetDataHandle& Data)
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
 
-	//Do something
+	// Only spawn projectiles on the Server.
+	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority)
+	{
+		AGDHeroCharacter* Hero = Cast<AGDHeroCharacter>(GetAvatarActorFromActorInfo());
+		if (!Hero)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		}
+
+		// Pass the damage to the Damage Execution Calculation through a SetByCaller value on the GameplayEffectSpec
+		FGameplayEffectSpecHandle DamageEffectSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffect, GetAbilityLevel());
+		DamageEffectSpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Damage")), Damage);
+
+		// Calculate proyectiles tranformation
+		FVector Start = Data.Get(0)->GetHitResult()->Location;
+		Start.Z = Start.Z + 1000;
+
+		FVector End = Data.Get(0)->GetHitResult()->ImpactPoint;
+		FRotator Rotation = UKismetMathLibrary::FindLookAtRotation(Start, End);
+
+		FTransform proyectileTransform = FTransform();
+		proyectileTransform.SetLocation(Start);
+		proyectileTransform.SetRotation(Rotation.Quaternion());
+		proyectileTransform.SetScale3D(FVector(4.0f));
+
+		//Spawn Proyectiles
+		AGDProjectile* Projectile = GetWorld()->SpawnActorDeferred<AGDProjectile>(ProjectileClass, proyectileTransform, GetOwningActorFromActorInfo(),
+																				  Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		Projectile->DamageEffectSpecHandle = DamageEffectSpecHandle;
+		Projectile->Range = 1000;
+		Projectile->FinishSpawning(proyectileTransform);
+
+	}
 
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
